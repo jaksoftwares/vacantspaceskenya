@@ -1,38 +1,53 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import Link from 'next/link';
-import { Search, MapPin, Bed, Square, Heart, Star, Filter } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import Image from 'next/image';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Search, MapPin, Filter, Heart, Square, Star, Layers3, Map, X } from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { supabase } from '@/lib/supabase';
+import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
+
+const MapView = dynamic(() => import('./components/MapView'), { ssr: false });
 
 export default function BrowsePage() {
   const [listings, setListings] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [counties, setCounties] = useState<any[]>([]);
+  const [amenities, setAmenities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedCounty, setSelectedCounty] = useState('all');
-  const [priceRange, setPriceRange] = useState([0, 1000000]);
+
+  const [filters, setFilters] = useState({
+    search: '',
+    category: 'all',
+    county: 'all',
+    price: [0, 500000],
+    size: [0, 1000],
+    verified: false,
+    ownerType: 'all',
+    amenities: [] as string[],
+  });
+
+  const [view, setView] = useState<'grid' | 'map'>('grid');
+  const [sortBy, setSortBy] = useState('recent');
 
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
-    const [listingsData, categoriesData, countiesData] = await Promise.all([
+    const [listingsData, categoriesData, countiesData, amenitiesData] = await Promise.all([
       supabase
         .from('listings')
         .select(`
@@ -43,292 +58,179 @@ export default function BrowsePage() {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(50),
-      supabase.from('categories').select('*').is('parent_id', null).order('sort_order'),
-      supabase.from('counties').select('*').order('name')
+        .limit(200),
+      supabase.from('categories').select('*').is('parent_id', null),
+      supabase.from('counties').select('*').order('name'),
+      supabase.from('amenities').select('*'),
     ]);
 
-    if (listingsData.data) setListings(listingsData.data);
-    if (categoriesData.data) setCategories(categoriesData.data);
-    if (countiesData.data) setCounties(countiesData.data);
+    setListings(listingsData.data || []);
+    setCategories(categoriesData.data || []);
+    setCounties(countiesData.data || []);
+    setAmenities(amenitiesData.data || []);
     setLoading(false);
   };
 
-  const filteredListings = listings.filter((listing) => {
-    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      listing.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || listing.category_id === selectedCategory;
-    const matchesCounty = selectedCounty === 'all' || listing.county_id === selectedCounty;
-    const matchesPrice = listing.price >= priceRange[0] && listing.price <= priceRange[1];
-
-    return matchesSearch && matchesCategory && matchesCounty && matchesPrice;
+  const filteredListings = listings.filter((l) => {
+    const matchSearch =
+      l.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+      l.description?.toLowerCase().includes(filters.search.toLowerCase());
+    const matchCategory = filters.category === 'all' || l.category_id === filters.category;
+    const matchCounty = filters.county === 'all' || l.county_id === filters.county;
+    const matchPrice = l.price >= filters.price[0] && l.price <= filters.price[1];
+    const matchSize = !l.size_sqm || (l.size_sqm >= filters.size[0] && l.size_sqm <= filters.size[1]);
+    const matchVerified = !filters.verified || l.verification_status === 'verified';
+    const matchOwner =
+      filters.ownerType === 'all' || l.listing_type === filters.ownerType;
+    const matchAmenities =
+      filters.amenities.length === 0 ||
+      filters.amenities.every((a) => l.amenities?.includes(a));
+    return matchSearch && matchCategory && matchCounty && matchPrice && matchSize && matchVerified && matchOwner && matchAmenities;
   });
 
-  const getPrimaryImage = (listing: any) => {
-    const primaryImage = listing.listing_images?.find((img: any) => img.is_primary);
-    return primaryImage?.url || listing.listing_images?.[0]?.url || '/placeholder.jpg';
-  };
+  const getPrimaryImage = (l: any) =>
+    l.listing_images?.find((img: any) => img.is_primary)?.url ||
+    l.listing_images?.[0]?.url ||
+    '/placeholder.jpg';
+
+  const resetFilters = () =>
+    setFilters({
+      search: '',
+      category: 'all',
+      county: 'all',
+      price: [0, 500000],
+      size: [0, 1000],
+      verified: false,
+      ownerType: 'all',
+      amenities: [],
+    });
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-4">Browse Vacant Spaces</h1>
-          <p className="text-muted-foreground">Find your perfect space from {listings.length}+ active listings</p>
+      <div className="container mx-auto px-4 py-6 flex-1">
+        {/* Header */}
+        <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">Discover Vacant Spaces</h1>
+            <p className="text-muted-foreground">
+              Explore {filteredListings.length}+ available spaces across Kenya
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectItem value="price-low">Price: Low → High</SelectItem>
+                <SelectItem value="price-high">Price: High → Low</SelectItem>
+                <SelectItem value="verified">Verified Only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setView(view === 'grid' ? 'map' : 'grid')}>
+              {view === 'grid' ? (
+                <>
+                  <Map className="h-4 w-4 mr-2" /> Map View
+                </>
+              ) : (
+                <>
+                  <Layers3 className="h-4 w-4 mr-2" /> Grid View
+                </>
+              )}
+            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="lg:hidden">
+                  <Filter className="h-4 w-4 mr-2" /> Filters
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Filters</SheetTitle>
+                </SheetHeader>
+                <div className="py-4 space-y-6">
+                  <FiltersContent {...{ filters, setFilters, resetFilters, categories, counties, amenities }} />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
 
         <div className="flex gap-8">
+          {/* Sidebar Filters */}
           <div className="hidden lg:block w-80 shrink-0">
             <Card className="sticky top-20">
-              <CardContent className="p-6 space-y-6">
-                <div>
-                  <h3 className="font-semibold mb-4">Filters</h3>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search listings..."
-                      className="pl-9"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>County</Label>
-                  <Select value={selectedCounty} onValueChange={setSelectedCounty}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Counties" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Counties</SelectItem>
-                      {counties.map((county) => (
-                        <SelectItem key={county.id} value={county.id}>{county.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Price Range (KES)</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {priceRange[0].toLocaleString()} - {priceRange[1].toLocaleString()}
-                    </span>
-                  </div>
-                  <Slider
-                    min={0}
-                    max={1000000}
-                    step={10000}
-                    value={priceRange}
-                    onValueChange={setPriceRange}
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Amenities</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="parking" />
-                      <label htmlFor="parking" className="text-sm cursor-pointer">Parking</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="security" />
-                      <label htmlFor="security" className="text-sm cursor-pointer">Security</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="electricity" />
-                      <label htmlFor="electricity" className="text-sm cursor-pointer">Electricity</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="water" />
-                      <label htmlFor="water" className="text-sm cursor-pointer">Water Supply</label>
-                    </div>
-                  </div>
-                </div>
-
-                <Button className="w-full" onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('all');
-                  setSelectedCounty('all');
-                  setPriceRange([0, 1000000]);
-                }}>
-                  Clear Filters
-                </Button>
+              <CardContent className="p-6">
+                <FiltersContent {...{ filters, setFilters, resetFilters, categories, counties, amenities }} />
               </CardContent>
             </Card>
           </div>
 
+          {/* Listings / Map */}
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-muted-foreground">
-                Showing {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
-              </p>
-              <div className="flex items-center gap-2">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="lg:hidden">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filters
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left">
-                    <SheetHeader>
-                      <SheetTitle>Filters</SheetTitle>
-                    </SheetHeader>
-                    <div className="py-6 space-y-6">
-                      <div className="space-y-2">
-                        <Label>Search</Label>
-                        <Input
-                          placeholder="Search listings..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Category</Label>
-                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-                <Select defaultValue="recent">
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recent">Most Recent</SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
-                    <SelectItem value="popular">Most Popular</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <div className="h-48 bg-slate-200 animate-pulse" />
-                    <CardContent className="p-4 space-y-2">
-                      <div className="h-4 bg-slate-200 rounded animate-pulse" />
-                      <div className="h-4 bg-slate-200 rounded animate-pulse w-2/3" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : filteredListings.length === 0 ? (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No listings found matching your criteria</p>
-                <Button className="mt-4" onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('all');
-                  setSelectedCounty('all');
-                }}>
-                  Clear Filters
-                </Button>
-              </Card>
+            {view === 'map' ? (
+              <MapView listings={filteredListings} />
             ) : (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredListings.map((listing) => (
-                  <Link key={listing.id} href={`/listings/${listing.id}`}>
-                    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 h-full group">
-                      <div className="relative h-48 overflow-hidden">
-                        <Image
-                          src={getPrimaryImage(listing)}
-                          alt={listing.title}
-                          fill
-                          className="object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="absolute top-2 right-2 rounded-full"
-                          onClick={(e) => {
-                            e.preventDefault();
-                          }}
-                        >
-                          <Heart className="h-4 w-4" />
-                        </Button>
-                        {listing.featured && (
-                          <Badge className="absolute top-2 left-2" variant="secondary">
-                            Featured
-                          </Badge>
-                        )}
-                        {listing.verification_status === 'verified' && (
-                          <Badge className="absolute bottom-2 left-2 bg-green-600">
-                            Verified
-                          </Badge>
-                        )}
-                      </div>
-                      <CardContent className="p-4">
-                        <div className="mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            {listing.categories?.name}
-                          </Badge>
-                        </div>
-                        <h3 className="font-semibold text-lg mb-2 line-clamp-1">{listing.title}</h3>
-                        <div className="flex items-center text-sm text-muted-foreground mb-3">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          <span className="line-clamp-1">{listing.counties?.name}, {listing.town}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-2xl font-bold text-primary">
-                              KES {listing.price.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-muted-foreground">per {listing.price_frequency}</p>
-                          </div>
-                          {listing.size_sqm && (
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Square className="h-3 w-3" />
-                              <span>{listing.size_sqm}m²</span>
-                            </div>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {loading ? (
+                  [...Array(6)].map((_, i) => (
+                    <Card key={i} className="overflow-hidden animate-pulse h-72" />
+                  ))
+                ) : filteredListings.length === 0 ? (
+                  <Card className="p-12 text-center">
+                    <p className="text-muted-foreground">No listings found.</p>
+                    <Button onClick={resetFilters} className="mt-4">Reset Filters</Button>
+                  </Card>
+                ) : (
+                  filteredListings.map((l) => (
+                    <Link key={l.id} href={`/listings/${l.id}`}>
+                      <Card className="overflow-hidden hover:shadow-lg transition-all group">
+                        <div className="relative h-48 overflow-hidden">
+                          <Image
+                            src={getPrimaryImage(l)}
+                            alt={l.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <Button size="icon" variant="secondary" className="absolute top-2 right-2 rounded-full">
+                            <Heart className="h-4 w-4" />
+                          </Button>
+                          {l.featured && <Badge className="absolute top-2 left-2">Featured</Badge>}
+                          {l.verification_status === 'verified' && (
+                            <Badge className="absolute bottom-2 left-2 bg-green-600">Verified</Badge>
                           )}
                         </div>
-                        {listing.avg_rating && (
-                          <div className="flex items-center gap-1 mt-2 text-sm">
-                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                            <span>{listing.avg_rating.toFixed(1)}</span>
-                            <span className="text-muted-foreground">({listing.reviews_count})</span>
+                        <CardContent className="p-4 space-y-1">
+                          <h3 className="font-semibold text-lg line-clamp-1">{l.title}</h3>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" /> {l.counties?.name}, {l.town}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-primary font-bold text-xl">KES {l.price.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">/ {l.price_frequency}</p>
+                            </div>
+                            {l.size_sqm && (
+                              <div className="flex items-center text-sm text-muted-foreground">
+                                <Square className="h-3 w-3 mr-1" /> {l.size_sqm} m²
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
+                          {l.avg_rating && (
+                            <div className="flex items-center gap-1 text-sm mt-1">
+                              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                              {l.avg_rating.toFixed(1)} ({l.reviews_count})
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -336,6 +238,116 @@ export default function BrowsePage() {
       </div>
 
       <Footer />
+    </div>
+  );
+}
+
+function FiltersContent({
+  filters,
+  setFilters,
+  resetFilters,
+  categories,
+  counties,
+  amenities,
+}: any) {
+  const toggleAmenity = (a: string) => {
+    setFilters({
+      ...filters,
+      amenities: filters.amenities.includes(a)
+        ? filters.amenities.filter((x: string) => x !== a)
+        : [...filters.amenities, a],
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search..."
+          className="pl-9"
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Category</Label>
+        <Select value={filters.category} onValueChange={(v) => setFilters({ ...filters, category: v })}>
+          <SelectTrigger><SelectValue placeholder="All Categories" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {categories.map((c: any) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>County</Label>
+        <Select value={filters.county} onValueChange={(v) => setFilters({ ...filters, county: v })}>
+          <SelectTrigger><SelectValue placeholder="All Counties" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {counties.map((c: any) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Price Range (KES)</Label>
+        <Slider min={0} max={500000} step={1000} value={filters.price} onValueChange={(v) => setFilters({ ...filters, price: v })} />
+        <p className="text-sm text-muted-foreground">{filters.price[0].toLocaleString()} - {filters.price[1].toLocaleString()}</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Size (m²)</Label>
+        <Slider min={0} max={1000} step={10} value={filters.size} onValueChange={(v) => setFilters({ ...filters, size: v })} />
+      </div>
+
+      <div className="space-y-3">
+        <Label>Amenities</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {amenities.map((a: any) => (
+            <div key={a.id} className="flex items-center space-x-2">
+              <Checkbox
+                id={a.id}
+                checked={filters.amenities.includes(a.slug)}
+                onCheckedChange={() => toggleAmenity(a.slug)}
+              />
+              <label htmlFor={a.id} className="text-sm cursor-pointer">{a.name}</label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label>Verified Only</Label>
+        <Checkbox
+          checked={filters.verified}
+          onCheckedChange={(v) => setFilters({ ...filters, verified: !!v })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Listing Type</Label>
+        <Select value={filters.ownerType} onValueChange={(v) => setFilters({ ...filters, ownerType: v })}>
+          <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="owner">Owner</SelectItem>
+            <SelectItem value="agent">Agent</SelectItem>
+            <SelectItem value="developer">Developer</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Button className="w-full" variant="outline" onClick={resetFilters}>
+        <X className="h-4 w-4 mr-2" /> Clear Filters
+      </Button>
     </div>
   );
 }
