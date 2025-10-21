@@ -21,10 +21,17 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
+    } else if (profile && profile.role !== 'user') {
+      // Redirect non-users to their appropriate dashboards
+      if (profile.role === 'admin') {
+        router.push('/admin/admin');
+      } else if (profile.role === 'agent') {
+        router.push('/agent/agent');
+      }
     } else if (user) {
       fetchData();
     }
-  }, [user, authLoading, router]);
+  }, [user, profile, authLoading, router]);
 
   const fetchData = async () => {
     if (!user) return;

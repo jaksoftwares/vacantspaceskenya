@@ -26,7 +26,12 @@ export default function AdminDashboard() {
     if (!authLoading && !user) {
       router.push('/login');
     } else if (profile && profile.role !== 'admin') {
-      router.push('/dashboard');
+      // Redirect non-admins to their appropriate dashboards
+      if (profile.role === 'agent') {
+        router.push('/agent/agent');
+      } else {
+        router.push('/dashboard');
+      }
     } else if (user && profile?.role === 'admin') {
       fetchData();
     }

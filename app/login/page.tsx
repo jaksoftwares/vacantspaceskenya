@@ -26,14 +26,14 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error, profile } = await signIn(email, password);
 
     if (error) {
       setError(error.message);
       toast.error('Login failed. Please check your credentials.');
     } else {
       toast.success('Welcome back!');
-      router.push('/dashboard');
+      router.push('/redirect');
     }
 
     setLoading(false);
@@ -92,7 +92,7 @@ export default function LoginPage() {
               Sign In
             </Button>
             <p className="text-sm text-center text-muted-foreground">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/register" className="text-primary hover:underline font-semibold">
                 Sign up
               </Link>
