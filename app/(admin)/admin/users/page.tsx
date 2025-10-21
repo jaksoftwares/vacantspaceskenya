@@ -43,15 +43,45 @@ export default function AdminUsersPage() {
 
   const fetchUsers = async () => {
     try {
+      console.log('Fetching users...');
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      console.log('Supabase Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+      // First try to get a simple count to test connection
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      console.log('Users count:', count);
+
+      if (countError) {
+        console.error('Count error:', countError);
+      }
+
+      // Now fetch the actual data
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Users data:', data);
+      console.log('Users count:', data?.length || 0);
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      // Show error in UI
+      setUsers([]);
     } finally {
       setLoading(false);
     }

@@ -48,11 +48,41 @@ export default function AdminListingsPage() {
 
   const fetchListings = async () => {
     try {
+      console.log('Fetching listings...');
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      console.log('Supabase Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+      // First try to get a simple count to test connection
+      const { count, error: countError } = await supabase
+        .from('listings')
+        .select('*', { count: 'exact', head: true });
+
+      console.log('Listings count:', count);
+
+      if (countError) {
+        console.error('Count error:', countError);
+      }
+
+      // Now fetch the actual data - try without joins first to test basic connection
+      const { data: basicData, error: basicError } = await supabase
+        .from('listings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      console.log('Basic listings data:', basicData);
+
+      if (basicError) {
+        console.error('Basic query error:', basicError);
+        throw basicError;
+      }
+
+      // Now try with joins
       const { data, error } = await supabase
         .from('listings')
         .select(`
           *,
-          profiles!listings_agent_id_fkey(
+          profiles!listings_user_id_fkey(
             full_name,
             email,
             avatar_url
@@ -60,18 +90,32 @@ export default function AdminListingsPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
 
-      const listingsWithAgents = data?.map(listing => ({
+      console.log('Listings data (with joins):', data);
+      console.log('Listings count (with joins):', data?.length || 0);
+
+      const listingsWithAgents = (data || basicData || [])?.map(listing => ({
         ...listing,
-        agent_name: listing.profiles?.full_name || 'Unknown Agent',
-        agent_email: listing.profiles?.email || '',
-        agent_avatar: listing.profiles?.avatar_url || ''
+        agent_name: (listing.profiles as any)?.full_name || 'Unknown Agent',
+        agent_email: (listing.profiles as any)?.email || '',
+        agent_avatar: (listing.profiles as any)?.avatar_url || '',
+        agent_id: listing.user_id // Use user_id as agent_id for consistency
       })) || [];
 
       setListings(listingsWithAgents);
     } catch (error) {
       console.error('Error fetching listings:', error);
+      setListings([]);
     } finally {
       setLoading(false);
     }

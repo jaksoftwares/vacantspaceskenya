@@ -93,51 +93,69 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      // Fetch comprehensive data
-      const [usersData, listingsData, verificationsData, agentsData] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, email, role, avatar_url, created_at, is_verified'),
-        supabase.from('listings').select(`
-          id, title, status, price, location, created_at, agent_id,
-          profiles!listings_agent_id_fkey(full_name)
-        `).order('created_at', { ascending: false }),
-        supabase.from('verification_requests').select('id').eq('status', 'pending'),
-        supabase.from('profiles').select('id, full_name, email, role, avatar_url, created_at, is_verified').eq('role', 'agent')
+      console.log('Fetching admin dashboard data...');
+
+      // Fetch comprehensive data with error handling for each query
+      const usersPromise = supabase.from('profiles').select('id, full_name, email, role, avatar_url, created_at, is_verified');
+      const listingsPromise = supabase.from('listings').select(`
+        id, title, status, price, location, created_at, user_id,
+        profiles!listings_user_id_fkey(full_name)
+      `).order('created_at', { ascending: false }).limit(50); // Add limit to prevent large queries
+      const verificationsPromise = supabase.from('verification_requests').select('id').eq('status', 'pending');
+
+      const [usersResult, listingsResult, verificationsResult] = await Promise.allSettled([
+        usersPromise,
+        listingsPromise,
+        verificationsPromise
       ]);
 
       // Process users data
-      if (usersData.data) {
-        const agents = usersData.data.filter(u => u.role === 'agent').length;
+      if (usersResult.status === 'fulfilled' && usersResult.value.data && Array.isArray(usersResult.value.data)) {
+        console.log('Users data:', usersResult.value.data);
+        const agents = usersResult.value.data.filter(u => u.role === 'agent').length;
+        const userData = usersResult.value.data;
         setStats(prev => ({
           ...prev,
-          totalUsers: usersData.data.length,
+          totalUsers: userData.length,
           totalAgents: agents
         }));
-        setUsers(usersData.data);
+        setUsers(userData);
+      } else if (usersResult.status === 'rejected') {
+        console.error('Users query failed:', usersResult.reason);
       }
 
       // Process listings data
-      if (listingsData.data) {
-        const active = listingsData.data.filter(l => l.status === 'active').length;
+      if (listingsResult.status === 'fulfilled' && listingsResult.value.data && Array.isArray(listingsResult.value.data)) {
+        console.log('Listings data:', listingsResult.value.data);
+        const active = listingsResult.value.data.filter(l => l.status === 'active').length;
+        const listingData = listingsResult.value.data;
         setStats(prev => ({
           ...prev,
-          totalListings: listingsData.data.length,
+          totalListings: listingData.length,
           activeListings: active
         }));
 
         // Structure listings with agent names
-        const listingsWithAgents = listingsData.data.map(listing => ({
+        const listingsWithAgents = listingData.map(listing => ({
           ...listing,
-          agent_name: (listing.profiles as any)?.full_name || 'Unknown Agent'
+          agent_name: (listing.profiles as any)?.full_name || 'Unknown Agent',
+          agent_id: listing.user_id // Use user_id as agent_id for consistency
         }));
         setListings(listingsWithAgents);
+      } else if (listingsResult.status === 'rejected') {
+        console.error('Listings query failed:', listingsResult.reason);
       }
 
       // Process verifications data
-      if (verificationsData.data) {
+      if (verificationsResult.status === 'fulfilled' && verificationsResult.value.data && Array.isArray(verificationsResult.value.data)) {
+        console.log('Verifications data:', verificationsResult.value.data);
+        const verificationData = verificationsResult.value.data;
         setStats(prev => ({
           ...prev,
-          pendingVerifications: verificationsData.data.length
+          pendingVerifications: verificationData.length
         }));
+      } else if (verificationsResult.status === 'rejected') {
+        console.error('Verifications query failed:', verificationsResult.reason);
       }
 
     } catch (error) {
