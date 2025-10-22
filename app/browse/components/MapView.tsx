@@ -66,7 +66,7 @@ function FitBounds({ listings }: { listings: any[] }) {
       .filter((l) => l.latitude && l.longitude)
       .map((l) => [l.latitude, l.longitude]);
     if (coords.length > 0) {
-      const bounds = L.latLngBounds(coords);
+      const bounds = L.latLngBounds(coords as [number, number][]);
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [listings, map]);
