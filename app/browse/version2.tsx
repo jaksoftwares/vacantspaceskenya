@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Header } from '@/components/home/Header';
-import Footer from '@/components/home/Footer';
+import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,16 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { 
-  Search, 
-  MapPin, 
-  Filter, 
-  Heart, 
-  Square, 
-  Star, 
-  Layers3, 
-  Map, 
-  X, 
+import {
+  Search,
+  MapPin,
+  Filter,
+  Heart,
+  Square,
+  Star,
+  Layers3,
+  Map,
+  X,
   SlidersHorizontal,
   TrendingUp,
   Calendar,
@@ -37,6 +37,7 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { PropertyCard } from './components/PropertyCard';
 
 const MapView = dynamic(() => import('./components/MapView'), { ssr: false });
 
@@ -75,7 +76,8 @@ export default function BrowsePage() {
           *,
           categories(name, slug),
           counties(name),
-          listing_images(url, is_primary)
+          listing_images(url, is_primary),
+          listing_amenities(amenities(name, slug))
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -104,7 +106,7 @@ export default function BrowsePage() {
     const matchOwner = filters.ownerType === 'all' || l.listing_type === filters.ownerType;
     const matchAmenities =
       filters.amenities.length === 0 ||
-      filters.amenities.every((a) => l.amenities?.includes(a));
+      filters.amenities.every((a) => l.listing_amenities?.some((la: any) => la.amenities?.slug === a));
     return matchSearch && matchCategory && matchCounty && matchPrice && matchSize && matchVerified && matchOwner && matchAmenities;
   });
 
@@ -403,12 +405,12 @@ export default function BrowsePage() {
                   </Card>
                 ) : (
                   sortedListings.map((l) => (
-                    <ListingCardHorizontal 
-                      key={l.id} 
-                      listing={l} 
-                      getPrimaryImage={getPrimaryImage}
+                    <PropertyCard
+                      key={l.id}
+                      listing={l}
                       isFavorite={favorites.includes(l.id)}
-                      toggleFavorite={toggleFavorite}
+                      onToggleFavorite={toggleFavorite}
+                      view="list"
                     />
                   ))
                 )}
@@ -442,12 +444,12 @@ export default function BrowsePage() {
                   </div>
                 ) : (
                   sortedListings.map((l) => (
-                    <ListingCard 
-                      key={l.id} 
-                      listing={l} 
-                      getPrimaryImage={getPrimaryImage}
+                    <PropertyCard
+                      key={l.id}
+                      listing={l}
                       isFavorite={favorites.includes(l.id)}
-                      toggleFavorite={toggleFavorite}
+                      onToggleFavorite={toggleFavorite}
+                      view="grid"
                     />
                   ))
                 )}
@@ -472,211 +474,6 @@ export default function BrowsePage() {
   );
 }
 
-// Listing Card Component (Grid View)
-function ListingCard({ listing, getPrimaryImage, isFavorite, toggleFavorite }: any) {
-  return (
-    <Card className="overflow-hidden hover:shadow-2xl transition-all duration-300 group border-0 shadow-md">
-      <Link href={`/listings/${listing.id}`} className="block">
-        <div className="relative h-56 overflow-hidden bg-gray-100">
-          <Image
-            src={getPrimaryImage(listing)}
-            alt={listing.title}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-          
-          {/* Badges Overlay */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {listing.featured && (
-              <Badge className="bg-gradient-to-r from-yellow-500 to-yellow-600 border-0 shadow-lg">
-                <Star className="h-3 w-3 mr-1 fill-white" />
-                Featured
-              </Badge>
-            )}
-            {listing.verification_status === 'verified' && (
-              <Badge className="bg-gradient-to-r from-green-500 to-green-600 border-0 shadow-lg">
-                <Verified className="h-3 w-3 mr-1" />
-                Verified
-              </Badge>
-            )}
-          </div>
-
-          {/* Favorite Button */}
-          <Button
-            size="icon"
-            variant="secondary"
-            className="absolute top-3 right-3 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
-            onClick={(e) => {
-              e.preventDefault();
-              toggleFavorite(listing.id);
-            }}
-          >
-            <Heart className={cn("h-4 w-4", isFavorite && "fill-red-500 text-red-500")} />
-          </Button>
-
-          {/* Category Badge */}
-          <div className="absolute bottom-3 left-3">
-            <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm">
-              {listing.categories?.name}
-            </Badge>
-          </div>
-        </div>
-      </Link>
-
-      <CardContent className="p-5 space-y-3">
-        <Link href={`/listings/${listing.id}`}>
-          <h3 className="font-bold text-lg line-clamp-1 hover:text-orange-600 transition-colors">
-            {listing.title}
-          </h3>
-        </Link>
-        
-        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-          <MapPin className="h-4 w-4 text-orange-500 shrink-0" />
-          <span className="line-clamp-1">{listing.counties?.name}, {listing.town}</span>
-        </p>
-
-        <div className="flex items-end justify-between pt-2">
-          <div>
-            <p className="text-2xl font-bold text-orange-600">
-              KES {listing.price.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">per {listing.price_frequency}</p>
-          </div>
-          {listing.size_sqm && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground bg-gray-50 px-3 py-1.5 rounded-lg">
-              <Square className="h-4 w-4" />
-              <span className="font-semibold">{listing.size_sqm}</span> m²
-            </div>
-          )}
-        </div>
-
-        {listing.avg_rating && (
-          <div className="flex items-center justify-between pt-2 border-t">
-            <div className="flex items-center gap-1">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={cn(
-                    "h-4 w-4",
-                    i < Math.round(listing.avg_rating)
-                      ? "fill-yellow-400 text-yellow-400"
-                      : "text-gray-300"
-                  )}
-                />
-              ))}
-              <span className="text-sm font-medium ml-1">
-                {listing.avg_rating.toFixed(1)}
-              </span>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              ({listing.reviews_count} reviews)
-            </span>
-          </div>
-        )}
-
-        <Link href={`/listings/${listing.id}`}>
-          <Button className="w-full mt-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700">
-            View Details
-            <Eye className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Horizontal Listing Card (List View)
-function ListingCardHorizontal({ listing, getPrimaryImage, isFavorite, toggleFavorite }: any) {
-  return (
-    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 group border-0 shadow-md">
-      <Link href={`/listings/${listing.id}`} className="flex flex-col md:flex-row">
-        <div className="relative md:w-80 h-56 md:h-auto overflow-hidden bg-gray-100 shrink-0">
-          <Image
-            src={getPrimaryImage(listing)}
-            alt={listing.title}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-          
-          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-            {listing.featured && (
-              <Badge className="bg-gradient-to-r from-yellow-500 to-yellow-600 border-0">
-                <Star className="h-3 w-3 mr-1 fill-white" />
-                Featured
-              </Badge>
-            )}
-            {listing.verification_status === 'verified' && (
-              <Badge className="bg-gradient-to-r from-green-500 to-green-600 border-0">
-                <Verified className="h-3 w-3 mr-1" />
-                Verified
-              </Badge>
-            )}
-          </div>
-
-          <Button
-            size="icon"
-            variant="secondary"
-            className="absolute top-3 right-3 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white"
-            onClick={(e) => {
-              e.preventDefault();
-              toggleFavorite(listing.id);
-            }}
-          >
-            <Heart className={cn("h-4 w-4", isFavorite && "fill-red-500 text-red-500")} />
-          </Button>
-        </div>
-
-        <div className="flex-1 p-6">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <Badge variant="secondary" className="mb-2">
-                {listing.categories?.name}
-              </Badge>
-              <h3 className="font-bold text-xl hover:text-orange-600 transition-colors line-clamp-1">
-                {listing.title}
-              </h3>
-            </div>
-            <div className="text-right ml-4">
-              <p className="text-3xl font-bold text-orange-600">
-                KES {listing.price.toLocaleString()}
-              </p>
-              <p className="text-sm text-muted-foreground">per {listing.price_frequency}</p>
-            </div>
-          </div>
-
-          <p className="text-muted-foreground flex items-center gap-2 mb-4">
-            <MapPin className="h-4 w-4 text-orange-500" />
-            {listing.counties?.name}, {listing.town}
-          </p>
-
-          <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-            {listing.description || 'No description available'}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-4">
-            {listing.size_sqm && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Square className="h-4 w-4" />
-                <span className="font-semibold">{listing.size_sqm} m²</span>
-              </div>
-            )}
-            {listing.avg_rating && (
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-sm font-medium">{listing.avg_rating.toFixed(1)}</span>
-                <span className="text-xs text-muted-foreground">({listing.reviews_count})</span>
-              </div>
-            )}
-            <Button size="sm" className="ml-auto bg-gradient-to-r from-orange-500 to-orange-600">
-              View Details
-              <Eye className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </Link>
-    </Card>
-  );
-}
 
 // Filters Component
 function FiltersContent({ filters, setFilters, resetFilters, categories, counties, amenities }: any) {
