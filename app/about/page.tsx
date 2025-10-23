@@ -24,10 +24,10 @@ export default function AboutPage() {
               About VacantSpacesKenya
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Revolutionizing Kenya's Property Market
+              Revolutionizing Kenya&apos;s Property Market
             </h1>
             <p className="text-xl text-gray-200 max-w-3xl mx-auto leading-relaxed">
-              We're transforming how Kenyans discover and advertise vacant spaces, connecting property seekers with verified opportunities across all 47 counties.
+              We&apos;re transforming how Kenyans discover and advertise vacant spaces, connecting property seekers with verified opportunities across all 47 counties.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
               <Button size="lg" variant="secondary" asChild>
@@ -89,7 +89,7 @@ export default function AboutPage() {
                   <div>
                     <h3 className="text-xl font-semibold mb-2">Nationwide Impact</h3>
                     <p className="text-muted-foreground">
-                      Today, we're proud to serve thousands of users across all 47 counties, from Nairobi's bustling CBD to the growing towns in every corner of Kenya.
+                      Today, we&apos;re proud to serve thousands of users across all 47 counties, from Nairobi&apos;s bustling CBD to the growing towns in every corner of Kenya.
                     </p>
                   </div>
                 </div>
@@ -155,7 +155,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="font-semibold mb-2">Continuous Growth</h4>
                   <p className="text-sm text-muted-foreground">
-                    We're committed to continuous improvement based on user feedback
+                    We&apos;re committed to continuous improvement based on user feedback
                   </p>
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function AboutPage() {
                   </div>
                 </div>
                 <p className="text-muted-foreground text-lg leading-relaxed">
-                  To become East Africa's leading platform for vacant space listings, empowering individuals and businesses to find their perfect space and helping agents maximize their reach and revenue.
+                  To become East Africa&apos;s leading platform for vacant space listings, empowering individuals and businesses to find their perfect space and helping agents maximize their reach and revenue.
                 </p>
                 <div className="mt-6 flex items-center gap-3">
                   <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
@@ -252,7 +252,7 @@ export default function AboutPage() {
                 </div>
                 <h3 className="text-xl font-bold mb-4">Customer First</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  Every feature and decision is made with our users' needs and experience at the forefront. Your success is our success.
+                  Every feature and decision is made with our users&apos; needs and experience at the forefront. Your success is our success.
                 </p>
               </CardContent>
             </Card>
@@ -288,7 +288,7 @@ export default function AboutPage() {
                 </div>
                 <h3 className="text-xl font-bold mb-4">Growth</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  We're committed to growing alongside our users and the Kenyan property market, adapting to new opportunities.
+                  We&apos;re committed to growing alongside our users and the Kenyan property market, adapting to new opportunities.
                 </p>
               </CardContent>
             </Card>
@@ -353,7 +353,7 @@ export default function AboutPage() {
                   <div>
                     <h3 className="text-xl font-semibold mb-2">Future-Focused</h3>
                     <p className="text-muted-foreground">
-                      Building the future of digital solutions, one product at a time. We're committed to driving innovation and creating lasting impact in the African tech ecosystem.
+                      Building the future of digital solutions, one product at a time. We&apos;re committed to driving innovation and creating lasting impact in the African tech ecosystem.
                     </p>
                   </div>
                 </div>
